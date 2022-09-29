@@ -444,6 +444,11 @@ func (ctx *serveContext) convertToContourConfigurationSpec() contour_api_v1alpha
 					MinimumProtocolVersion: ctx.Config.TLS.MinimumProtocolVersion,
 					CipherSuites:           cipherSuites,
 				},
+				Tracing: &contour_api_v1alpha1.TracingConfig{
+					ClusterName: ctx.Config.Listener.Tracing.ClusterName,
+					SNI:         ctx.Config.Listener.Tracing.SNI,
+					Timeout:     &ctx.Config.Listener.Tracing.Timeout,
+				},
 			},
 			Service: &contour_api_v1alpha1.NamespacedName{
 				Name:      ctx.Config.EnvoyServiceName,

@@ -90,6 +90,11 @@ type BootstrapConfig struct {
 	// DNSLookupFamily specifies DNS Resolution Policy to use for Envoy -> Contour cluster name lookup.
 	// Either v4, v6 or auto.
 	DNSLookupFamily string
+
+	TracingEnabled          bool
+	TracingClusterName      string
+	TracingCollectorAddress string
+	TracingCollectorPort    int
 }
 
 // GetXdsAddress returns the address configured or defaults to "127.0.0.1"
@@ -112,6 +117,21 @@ func (c *BootstrapConfig) GetAdminAccessLogPath() string {
 // GetDNSLookupFamily returns the configured dns lookup family or defaults to "auto"
 func (c *BootstrapConfig) GetDNSLookupFamily() string {
 	return stringOrDefault(c.DNSLookupFamily, "auto")
+}
+
+// GetTracingClusterName returns the cluster name for tracing or defaults to "tracing"
+func (c *BootstrapConfig) GetTracingClusterName() string {
+	return stringOrDefault(c.TracingClusterName, "tracing")
+}
+
+// GetTracingCollectorAddress returns the address configured or defaults to "127.0.0.1"
+func (c *BootstrapConfig) GetTracingCollectorAddress() string {
+	return stringOrDefault(c.TracingCollectorAddress, "127.0.0.1")
+}
+
+// GetTracingCollectorPort returns the port configured or defaults to "4317"
+func (c *BootstrapConfig) GetTracingCollectorPort() int {
+	return intOrDefault(c.TracingCollectorPort, 4317)
 }
 
 // ValidAdminAddress checks if the address supplied is

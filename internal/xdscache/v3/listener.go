@@ -17,12 +17,13 @@ import (
 	"path"
 	"sort"
 	"sync"
+	"time"
 
 	envoy_accesslog_v3 "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3"
 	envoy_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	http "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	envoy_tls_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
-	resource "github.com/envoyproxy/go-control-plane/pkg/resource/v3"
+	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/golang/protobuf/proto"
 	contour_api_v1alpha1 "github.com/projectcontour/contour/apis/projectcontour/v1alpha1"
 	"github.com/projectcontour/contour/internal/contour"
@@ -137,6 +138,8 @@ type ListenerConfig struct {
 	// RateLimitConfig optionally configures the global Rate Limit Service to be
 	// used.
 	RateLimitConfig *RateLimitConfig
+
+	TracingConfig *contour_api_v1alpha1.TracingConfig
 }
 
 type RateLimitConfig struct {
@@ -389,15 +392,18 @@ func (c *ListenerCache) OnChange(root *dag.DAG) {
 					AllowChunkedLength(cfg.AllowChunkedLength).
 					MergeSlashes(cfg.MergeSlashes).
 					NumTrustedHops(cfg.XffNumTrustedHops).
-					AddFilter(envoy_v3.GlobalRateLimitFilter(envoyGlobalRateLimitConfig(cfg.RateLimitConfig))).
-					Get()
+					AddFilter(envoy_v3.GlobalRateLimitFilter(envoyGlobalRateLimitConfig(cfg.RateLimitConfig)))
+
+				if cfg.TracingConfig.ClusterName != "" {
+					cm = cm.OtelTracing(cfg.TracingConfig.ClusterName, cfg.TracingConfig.SNI, timeout.DurationSetting(5*time.Second))
+				}
 
 				listeners[httpListener.Name] = envoy_v3.Listener(
 					httpListener.Name,
 					httpListener.Address,
 					httpListener.Port,
 					proxyProtocol(cfg.UseProxyProto),
-					cm,
+					cm.Get(),
 				)
 			}
 		}
@@ -442,10 +448,12 @@ func (c *ListenerCache) OnChange(root *dag.DAG) {
 					AllowChunkedLength(cfg.AllowChunkedLength).
 					MergeSlashes(cfg.MergeSlashes).
 					NumTrustedHops(cfg.XffNumTrustedHops).
-					AddFilter(envoy_v3.GlobalRateLimitFilter(envoyGlobalRateLimitConfig(cfg.RateLimitConfig))).
-					Get()
+					AddFilter(envoy_v3.GlobalRateLimitFilter(envoyGlobalRateLimitConfig(cfg.RateLimitConfig)))
+				if cfg.TracingConfig.ClusterName != "" {
+					cm = cm.OtelTracing(cfg.TracingConfig.ClusterName, cfg.TracingConfig.SNI, timeout.DurationSetting(5*time.Second))
+				}
 
-				filters = envoy_v3.Filters(cm)
+				filters = envoy_v3.Filters(cm.Get())
 
 				alpnProtos = envoy_v3.ProtoNamesForVersions(cfg.DefaultHTTPVersions...)
 			} else {
@@ -507,11 +515,14 @@ func (c *ListenerCache) OnChange(root *dag.DAG) {
 					AllowChunkedLength(cfg.AllowChunkedLength).
 					MergeSlashes(cfg.MergeSlashes).
 					NumTrustedHops(cfg.XffNumTrustedHops).
-					AddFilter(envoy_v3.GlobalRateLimitFilter(envoyGlobalRateLimitConfig(cfg.RateLimitConfig))).
-					Get()
+					AddFilter(envoy_v3.GlobalRateLimitFilter(envoyGlobalRateLimitConfig(cfg.RateLimitConfig)))
+
+				if cfg.TracingConfig.ClusterName != "" {
+					cm = cm.OtelTracing(cfg.TracingConfig.ClusterName, cfg.TracingConfig.SNI, timeout.DurationSetting(5*time.Second))
+				}
 
 				// Default filter chain
-				filters = envoy_v3.Filters(cm)
+				filters = envoy_v3.Filters(cm.Get())
 
 				listeners[listener.Name].FilterChains = append(listeners[listener.Name].FilterChains, envoy_v3.FilterChainTLSFallback(downstreamTLS, filters))
 			}

@@ -15,7 +15,7 @@ package main
 
 import (
 	"github.com/projectcontour/contour/internal/envoy"
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 // registerBootstrap registers the bootstrap subcommand and flags
@@ -36,5 +36,10 @@ func registerBootstrap(app *kingpin.Application) (*kingpin.CmdClause, *envoy.Boo
 	bootstrap.Flag("namespace", "The namespace the Envoy container will run in.").Envar("CONTOUR_NAMESPACE").Default("projectcontour").StringVar(&config.Namespace)
 	bootstrap.Flag("xds-resource-version", "The versions of the xDS resources to request from Contour.").Default("v3").StringVar((*string)(&config.XDSResourceVersion))
 	bootstrap.Flag("dns-lookup-family", "Defines what DNS Resolution Policy to use for Envoy -> Contour cluster name lookup. Either v4, v6 or auto.").StringVar(&config.DNSLookupFamily)
+	bootstrap.Flag("tracing-enabled", "Enables tracing cluster").BoolVar(&config.TracingEnabled)
+	bootstrap.Flag("tracing-collector-address", "Address for tracing").StringVar(&config.TracingCollectorAddress)
+	bootstrap.Flag("tracing-collector-port", "Address for tracing").IntVar(&config.TracingCollectorPort)
+	bootstrap.Flag("tracing-cluster-name", "Cluster name for tracing").StringVar(&config.TracingClusterName)
+
 	return bootstrap, &config
 }

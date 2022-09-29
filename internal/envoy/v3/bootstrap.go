@@ -155,7 +155,7 @@ func bootstrap(c *envoy.BootstrapConfig) ([]bootstrapf, error) {
 }
 
 func bootstrapConfig(c *envoy.BootstrapConfig) *envoy_bootstrap_v3.Bootstrap {
-	return &envoy_bootstrap_v3.Bootstrap{
+	cfg := &envoy_bootstrap_v3.Bootstrap{
 		LayeredRuntime: &envoy_bootstrap_v3.LayeredRuntime{
 			Layers: []*envoy_bootstrap_v3.RuntimeLayer{
 				{
@@ -246,6 +246,21 @@ func bootstrapConfig(c *envoy.BootstrapConfig) *envoy_bootstrap_v3.Bootstrap {
 			Address:   UnixSocketAddress(c.GetAdminAddress(), c.GetAdminPort()),
 		},
 	}
+	if c.TracingEnabled {
+		cfg.StaticResources.Clusters = append(cfg.StaticResources.Clusters, &envoy_cluster_v3.Cluster{
+			Name:                 c.GetTracingClusterName(),
+			ConnectTimeout:       protobuf.Duration(5 * time.Second),
+			ClusterDiscoveryType: ClusterDiscoveryTypeForAddress(c.GetTracingCollectorAddress(), envoy_cluster_v3.Cluster_STRICT_DNS),
+			LbPolicy:             envoy_cluster_v3.Cluster_ROUND_ROBIN,
+			LoadAssignment: &envoy_endpoint_v3.ClusterLoadAssignment{
+				ClusterName: c.GetTracingClusterName(),
+				Endpoints: Endpoints(
+					SocketAddress(c.GetTracingCollectorAddress(), c.GetTracingCollectorPort()),
+				),
+			},
+		})
+	}
+	return cfg
 }
 
 func adminAccessLog(logPath string) []*envoy_config_accesslog_v3.AccessLog {

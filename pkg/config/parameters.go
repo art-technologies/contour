@@ -415,7 +415,8 @@ type ListenerParameters struct {
 	// ConnectionBalancer. If the value is exact, the listener will use the exact connection balancer
 	// See https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/listener.proto#envoy-api-msg-listener-connectionbalanceconfig
 	// for more information.
-	ConnectionBalancer string `yaml:"connection-balancer"`
+	ConnectionBalancer string            `yaml:"connection-balancer"`
+	Tracing            TracingParameters `yaml:"tracing"`
 }
 
 func (p *ListenerParameters) Validate() error {
@@ -427,6 +428,12 @@ func (p *ListenerParameters) Validate() error {
 		return fmt.Errorf("invalid listener connection balancer value %q, only 'exact' connection balancing is supported for now", p.ConnectionBalancer)
 	}
 	return nil
+}
+
+type TracingParameters struct {
+	ClusterName string `yaml:"cluster-name"`
+	SNI         string `yaml:"sni,omitempty"`
+	Timeout     string `yaml:"timeout,omitempty"`
 }
 
 // Parameters contains the configuration file parameters for the

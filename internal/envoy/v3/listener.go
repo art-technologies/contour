@@ -23,6 +23,7 @@ import (
 	accesslog "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3"
 	envoy_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	tracev3 "github.com/envoyproxy/go-control-plane/envoy/config/trace/v3"
 	envoy_gzip_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/compression/gzip/compressor/v3"
 	envoy_compressor_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/compressor/v3"
 	envoy_cors_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/cors/v3"
@@ -159,6 +160,7 @@ type httpConnectionManagerBuilder struct {
 	allowChunkedLength            bool
 	mergeSlashes                  bool
 	numTrustedHops                uint32
+	otelTracingConfig             *tracev3.OpenTelemetryConfig
 }
 
 // RouteConfigName sets the name of the RDS element that contains
@@ -373,6 +375,12 @@ func (b *httpConnectionManagerBuilder) AddFilter(f *http.HttpFilter) *httpConnec
 	return b
 }
 
+// OtelTracing sets the tracing endpoint configuration.
+func (b *httpConnectionManagerBuilder) OtelTracing(clusterName, sni string, timeout timeout.Setting) *httpConnectionManagerBuilder {
+	b.otelTracingConfig = &tracev3.OpenTelemetryConfig{GrpcService: GrpcService(clusterName, sni, timeout)}
+	return b
+}
+
 // Validate runs builtin validation rules against the current builder state.
 func (b *httpConnectionManagerBuilder) Validate() error {
 
@@ -442,10 +450,12 @@ func (b *httpConnectionManagerBuilder) Get() *envoy_listener_v3.Filter {
 		PreserveExternalRequestId: true,
 		MergeSlashes:              b.mergeSlashes,
 
-		RequestTimeout:      envoy.Timeout(b.requestTimeout),
-		StreamIdleTimeout:   envoy.Timeout(b.streamIdleTimeout),
-		DrainTimeout:        envoy.Timeout(b.connectionShutdownGracePeriod),
-		DelayedCloseTimeout: envoy.Timeout(b.delayedCloseTimeout),
+		RequestTimeout:               envoy.Timeout(b.requestTimeout),
+		StreamIdleTimeout:            envoy.Timeout(b.streamIdleTimeout),
+		DrainTimeout:                 envoy.Timeout(b.connectionShutdownGracePeriod),
+		DelayedCloseTimeout:          envoy.Timeout(b.delayedCloseTimeout),
+		GenerateRequestId:            protobuf.Bool(true),
+		AlwaysSetRequestIdInResponse: true,
 	}
 
 	// Max connection duration is infinite/disabled by default in Envoy, so if the timeout setting
@@ -468,6 +478,43 @@ func (b *httpConnectionManagerBuilder) Get() *envoy_listener_v3.Filter {
 		cm.StatPrefix = b.routeConfigName
 	}
 
+	if b.otelTracingConfig != nil {
+		cm.Tracing = &http.HttpConnectionManager_Tracing{
+			ClientSampling:  &envoy_type.Percent{Value: 100.0},
+			RandomSampling:  &envoy_type.Percent{Value: 100.0},
+			OverallSampling: &envoy_type.Percent{Value: 100.0},
+			// Provider: &tracev3.Tracing_Http{
+			// 	Name: "envoy.tracers.opentelemetry",
+			// 	ConfigType: &tracev3.Tracing_Http_TypedConfig{
+			// 		TypedConfig: protobuf.MustMarshalAny(b.otelTracingConfig),
+			// 	},
+			// },
+			Provider: &tracev3.Tracing_Http{
+				Name: "envoy.tracers.zipkin",
+				ConfigType: &tracev3.Tracing_Http_TypedConfig{
+					TypedConfig: protobuf.MustMarshalAny(&tracev3.ZipkinConfig{
+						CollectorCluster:         b.otelTracingConfig.GrpcService.GetEnvoyGrpc().ClusterName,
+						CollectorEndpoint:        "/api/v2/spans",
+						CollectorEndpointVersion: tracev3.ZipkinConfig_HTTP_PROTO,
+						TraceId_128Bit:           true,
+					}),
+				},
+			},
+			// Provider: &tracev3.Tracing_Http{
+			// 	Name: "envoy.tracers.opencensus",
+			// 	ConfigType: &tracev3.Tracing_Http_TypedConfig{
+			// 		TypedConfig: protobuf.MustMarshalAny(&tracev3.OpenCensusConfig{
+			// 			OcagentExporterEnabled: true,
+			// 			OcagentGrpcService:     b.otelTracingConfig.GrpcService,
+			// 			OutgoingTraceContext: []tracev3.OpenCensusConfig_TraceContext{
+			// 				tracev3.OpenCensusConfig_TRACE_CONTEXT,
+			// 				tracev3.OpenCensusConfig_GRPC_TRACE_BIN,
+			// 			},
+			// 		}),
+			// 	},
+			// },
+		}
+	}
 	return &envoy_listener_v3.Filter{
 		Name: wellknown.HTTPConnectionManager,
 		ConfigType: &envoy_listener_v3.Filter_TypedConfig{

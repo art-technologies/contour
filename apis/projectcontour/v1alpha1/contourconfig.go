@@ -210,6 +210,20 @@ type MetricsTLS struct {
 	KeyFile string `json:"keyFile,omitempty"`
 }
 
+// TracingConfig defines the tracing.
+type TracingConfig struct {
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// +optional
+	SNI string `json:"sni,omitempty"`
+
+	// +optional
+	Timeout *string `json:"timeout,omitempty"`
+}
+
 // HTTPVersionType is the name of a supported HTTP version.
 type HTTPVersionType string
 
@@ -359,6 +373,8 @@ type EnvoyListenerConfig struct {
 	// TLS holds various configurable Envoy TLS listener values.
 	// +optional
 	TLS *EnvoyTLS `json:"tls,omitempty"`
+
+	Tracing *TracingConfig `json:"tracing,omitempty"`
 }
 
 // EnvoyTLS describes tls parameters for Envoy listneners.

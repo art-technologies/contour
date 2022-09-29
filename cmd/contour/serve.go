@@ -350,6 +350,7 @@ func (s *Server) doServe() error {
 		MergeSlashes:                 !*contourConfiguration.Envoy.Listener.DisableMergeSlashes,
 		XffNumTrustedHops:            *contourConfiguration.Envoy.Network.XffNumTrustedHops,
 		ConnectionBalancer:           contourConfiguration.Envoy.Listener.ConnectionBalancer,
+		TracingConfig:                contourConfiguration.Envoy.Listener.Tracing,
 	}
 
 	if listenerConfig.RateLimitConfig, err = s.setupRateLimitService(contourConfiguration); err != nil {
